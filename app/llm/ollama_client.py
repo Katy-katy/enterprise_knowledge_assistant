@@ -2,6 +2,11 @@ import requests
 from typing import Iterator
 
 from app.llm.base import LLMClient
+from app.utils import stats
+
+
+OLLAMA_NUM_THREAD=8
+OLLAMA_TIMEOUT = 600
 
 
 class OllamaClient(LLMClient):
@@ -23,17 +28,21 @@ class OllamaClient(LLMClient):
             "options": {
                 "num_predict": 150,
                 "temperature": 0.2,
-                "top_p": 0.9
+                "top_p": 0.9,
+                "num_thread": OLLAMA_NUM_THREAD,
+                "num_batch": 512,
+                "num_ctx": 1024, # since we have a small prompt we do not need default ~4096 context length
+                "keep_alive": "10m" # keep the connection alive for 10 minutes to avoid loading 
+
             }
         }
-        print("+++++++++++++ payload: ", payload)
         try:
-            response = requests.post(url, json=payload, timeout=600)
+            response = requests.post(url, json=payload, timeout=OLLAMA_TIMEOUT)
             response.raise_for_status()
         except requests.RequestException as e:
             raise RuntimeError(f"Ollama request failed: {e}")
         data = response.json()
-        print("+++++++++++++5: ", data)
+        stats(data)
         return data.get("response", "")
 
     def generate_stream(self, prompt: str) -> Iterator[str]:
@@ -46,7 +55,11 @@ class OllamaClient(LLMClient):
             "options": {
                 "num_predict": 150,
                 "temperature": 0.2,
-                "top_p": 0.9
+                "top_p": 0.9,
+                "num_thread": OLLAMA_NUM_THREAD,
+                "num_batch": 512,
+                "num_ctx": 1024, # since we have a small prompt we do not need default ~4096 context length
+                "keep_alive": "10m" # keep the connection alive for 10 minutes to avoid loading 
             }
         }
 

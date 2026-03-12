@@ -17,9 +17,9 @@ orchestrator = Orchestrator(llm_client=llm_client)
 
 
 @app.post("/ask", response_model=AskResponse)
-def ask(request: AskRequest) -> AskResponse:
+async def ask(request: AskRequest) -> AskResponse:
     try:
-        return orchestrator.handle_question(request.question)
+        return await orchestrator.handle_question(request.question)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
