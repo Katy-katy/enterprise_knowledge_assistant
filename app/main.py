@@ -5,6 +5,8 @@ import json
 from app.core.orchestrator import Orchestrator
 from app.llm.ollama_client import OllamaClient
 from app.models.schemas import AskRequest, AskResponse
+from app.retrieval.embeddings import EmbeddingClient
+
 
 app = FastAPI(
     title="Enterprise Knowledge Assistant",
@@ -13,7 +15,11 @@ app = FastAPI(
 )
 
 llm_client = OllamaClient(base_url="http://localhost:11434", model_name="phi")
-orchestrator = Orchestrator(llm_client=llm_client)
+embedding_client = EmbeddingClient(
+    base_url="http://localhost:11434",
+    model_name="nomic-embed-text"
+)
+orchestrator = Orchestrator(llm_client=llm_client, embedding_client=embedding_client)
 
 
 @app.post("/ask", response_model=AskResponse)
