@@ -31,8 +31,27 @@ async def ask(request: AskRequest) -> AskResponse:
 
 @app.post("/ask-stream")
 def ask_stream(request: AskRequest):
-    def stream():
-        for chunk in llm_client.generate_stream(request.question):
+    async def stream():
+
+        # reuse retrieval logic
+        query_embedding = embedding_client.embed(request.question)
+        results = orchestrator.vector_store.search(query_embedding, top_k=3)
+
+        context = "\n\n".join([doc for _, doc in results])
+
+        prompt = f"""
+Answer the question using the context below.
+
+Context:
+{context}
+
+Question:
+{request.question}
+
+Answer:
+"""
+
+        for chunk in llm_client.generate_stream(prompt):
             data = json.loads(chunk)
             if "response" in data:
                 yield data["response"]
