@@ -7,7 +7,7 @@ from app.retrieval.embeddings import EmbeddingClient
 from app.retrieval.vector_store import VectorStore
 
 
-TOP_K_RETRIEVAL = 10
+TOP_K_RETRIEVAL = 20
 TOP_K_RERANKING = 3
 
 
@@ -19,35 +19,34 @@ class Orchestrator:
 
     def rerank(self, question: str, documents: list[str], top_k: int = 3):
 
-        scored = []
+        prompt = f"""
+    You are a ranking system.
 
-        for doc in documents:
+    Given a question and a list of documents,
+    return the {top_k} most relevant documents.
 
-            prompt = f"""
-        Rate how relevant this document is to the question.
+    Question:
+    {question}
 
-        Question:
-        {question}
+    Documents:
+    """
 
-        Document:
-        {doc}
+        for i, doc in enumerate(documents):
+            prompt += f"\n[{i}] {doc}\n"
 
-        Score from 0 to 10:
-        """
+        prompt += f"""
 
-            score_text = self.llm_client.generate(prompt)
+    Return ONLY the indices of the top {top_k} documents in order.
+    Example: [2, 0, 3]
+    """
 
-            try:
-                score = float(score_text.strip().split()[0])
-            except:
-                score = 0.0
+        response = self.llm_client.generate(prompt)
 
-            scored.append((score, doc))
-
-        scored.sort(reverse=True)
-
-        return [doc for _, doc in scored[:top_k]]
-
+        try:
+            indices = eval(response.strip())
+            return [documents[i] for i in indices[:top_k]]
+        except:
+            return documents[:top_k]
 
     async def handle_question(self, question: str) -> AskResponse:
         start_time = time.time()
