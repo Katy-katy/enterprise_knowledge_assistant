@@ -8,11 +8,11 @@ class VectorStore:
     def __init__(self, path: str = "vector_store.json"):
         self.path = path
         self.embeddings: List[np.ndarray] = []
-        self.documents: List[str] = []
+        self.documents: List[dict] = []
 
         self._load()
 
-    def add(self, embedding: List[float], document: str):
+    def add(self, embedding: List[float], document: dict):
         self.embeddings.append(np.array(embedding))
         self.documents.append(document)
 

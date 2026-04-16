@@ -53,9 +53,19 @@ class Orchestrator:
 
         query_embedding = self.embedding_client.embed(question)
         results = self.vector_store.search(query_embedding, top_k=TOP_K_RETRIEVAL)
-        retrieved_chunks = [doc for _, doc in results]
-        reranked_docs = self.rerank(question, candidate_docs, top_k=TOP_K_RERANKING)
-        context = "\n\n".join(reranked_docs)
+        candidate_docs = [doc for _, doc in results]
+        reranked_docs = self.rerank(
+            question,
+            [doc["text"] for doc in candidate_docs],
+            top_k=TOP_K_RERANKING
+        )
+        final_docs = []
+
+        for doc in candidate_docs:
+            if doc["text"] in reranked_docs:
+                final_docs.append(doc)
+        print("Final docs:", len(final_docs))
+        context = "\n\n".join([doc["text"] for doc in final_docs])
         prompt = f"""Answer the question using the context below.
 
 Context:
@@ -74,12 +84,15 @@ Answer:
             self.llm_client.generate,
             prompt
         )
-
+        citations = [
+            f"Page {doc['page']} (chunk {doc['chunk_id']})"
+            for doc in final_docs
+        ]
         latency_ms = round((time.time() - start_time) * 1000, 2)
 
         return AskResponse(
             answer=answer,
-            citations=retrieved_chunks,
+            citations=citations,
             confidence=0.0,
             latency_ms=latency_ms,
             model=self.llm_client.model_name,

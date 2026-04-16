@@ -30,14 +30,30 @@ async def ask(request: AskRequest) -> AskResponse:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/ask-stream")
-def ask_stream(request: AskRequest):
+@app.post("/ask_stream")
+async def ask_stream(request: AskRequest):
+
     async def stream():
 
-        # reuse retrieval logic
+        # 1️⃣ Retrieval
         query_embedding = embedding_client.embed(request.question)
-        results = orchestrator.vector_store.search(query_embedding, top_k=3)
+        results = orchestrator.vector_store.search(query_embedding, top_k=15)
 
-        context = "\n\n".join([doc for _, doc in results])
+        candidate_docs = [doc for _, doc in results]
+
+        reranked_docs = orchestrator.rerank(
+            request.question,
+            [doc["text"] for doc in candidate_docs],
+            top_k=3
+        )
+
+        final_docs = [
+            doc for doc in candidate_docs
+            if doc["text"] in reranked_docs
+        ]
+
+        # 2️⃣ Build context
+        context = "\n\n".join([doc["text"] for doc in final_docs])
 
         prompt = f"""
 Answer the question using the context below.
@@ -51,12 +67,31 @@ Question:
 Answer:
 """
 
-        for chunk in llm_client.generate_stream(prompt):
-            data = json.loads(chunk)
-            if "response" in data:
-                yield data["response"]
+        # 3️⃣ STREAM TOKENS
+        for token in llm_client.generate_stream(prompt):
+            yield json.dumps({
+                "type": "token",
+                "content": token
+            }) + "\n"
 
-    return StreamingResponse(stream(), media_type="text/plain")
+        # 4️⃣ SEND CITATIONS AT END
+        citations = [
+            f"Page {doc['page']} (chunk {doc['chunk_id']})"
+            for doc in final_docs
+        ]
+        print("Citations========================================:", citations)
+
+        yield json.dumps({
+            "type": "citations",
+            "content": citations
+        }) + "\n"
+
+        # 5️⃣ DONE SIGNAL
+        yield json.dumps({"type": "done"}) + "\n"
+
+    return StreamingResponse(stream(), media_type="application/json")
+
+
 
 @app.get("/health")
 def health():

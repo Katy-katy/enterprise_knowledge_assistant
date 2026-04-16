@@ -1,5 +1,5 @@
-from app.retrieval.pdf_loader import load_pdf
-from app.retrieval.chunker import chunk_text
+from app.retrieval.pdf_loader import load_pdf_with_pages
+from app.retrieval.chunker import chunk_document
 from app.retrieval.embeddings import EmbeddingClient
 from app.retrieval.vector_store import VectorStore
 
@@ -10,15 +10,22 @@ embedder = EmbeddingClient(
 
 store = VectorStore()
 
-text = load_pdf("sample.pdf")
+pages = load_pdf_with_pages("sample.pdf")
 
-chunks = chunk_text(text)
+for page in pages:
+    chunks = chunk_document(page["text"])
+    print("Chunks:", len(chunks))
+    for i, chunk in enumerate(chunks):
 
-print("Chunks:", len(chunks))
+        embedding = embedder.embed(chunk)
 
-for chunk in chunks:
-    embedding = embedder.embed(chunk)
-    store.add(embedding, chunk)
+        metadata = {
+            "text": chunk,
+            "page": page["page"],
+            "chunk_id": f"page_{page['page']}_chunk_{i}"
+        }
+
+        store.add(embedding, metadata)
 
 store.save()
 

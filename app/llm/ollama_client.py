@@ -1,5 +1,6 @@
 import requests
 from typing import Iterator
+import json
 
 from app.llm.base import LLMClient
 from app.utils import stats
@@ -67,6 +68,12 @@ class OllamaClient(LLMClient):
             response.raise_for_status()
 
             for line in response.iter_lines():
-                if line:
-                    data = line.decode("utf-8")
-                    yield data
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line.decode("utf-8"))
+                    token = data.get("response", "")
+                    if token:
+                        yield token
+                except:
+                    continue
